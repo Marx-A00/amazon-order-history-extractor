@@ -3,13 +3,14 @@
 Amazon Order History Extractor
 
 This script extracts your Amazon order history after manual login and saves it to CSV/JSON files.
+It can search for specific order numbers or extract all orders.
 """
 import asyncio
 import re
 import sys
 import time
 from datetime import datetime
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Set
 from urllib.parse import urlparse, parse_qs
 
 from playwright.async_api import async_playwright, Browser, Page, ElementHandle
@@ -32,6 +33,8 @@ class AmazonOrderExtractor:
         self.browser = None
         self.page = None
         self.orders = []
+        self.target_order_ids = set()
+        self.found_order_ids = set()
     
     async def setup(self):
         """Set up the browser and page."""
@@ -39,6 +42,10 @@ class AmazonOrderExtractor:
         self.browser = await playwright.chromium.launch(headless=config.HEADLESS)
         self.page = await self.browser.new_page()
         await self.page.set_viewport_size({"width": 1280, "height": 800})
+        
+        # Set up target order IDs if provided
+        if config.ORDER_NUMBERS:
+            self.target_order_ids = set(config.ORDER_NUMBERS)
     
     async def navigate_to_orders(self):
         """Navigate to the Amazon orders page and wait for manual login."""
@@ -64,6 +71,101 @@ class AmazonOrderExtractor:
                 await year_dropdown.select_option(value=config.YEAR_FILTER)
                 # Wait for the page to load with the filtered orders
                 await self.page.wait_for_load_state("networkidle")
+    
+    async def navigate_to_search_page(self):
+        """Navigate to the Amazon order search page."""
+        print("Navigating to Amazon Orders Search page...")
+        await self.page.goto(config.ORDER_SEARCH_URL)
+        
+        # Check if we need to login
+        if await self.page.title() == "Amazon Sign-In":
+            print("\n⚠️ Please log in to your Amazon account in the browser window")
+            print("The script will continue automatically after you log in\n")
+            
+            # Wait for successful login
+            await self.page.wait_for_selector(config.SELECTORS["login_success"], 
+                                              timeout=300000)  # 5 minute timeout for login
+        
+        print("Login successful! Ready to search for specific orders...")
+    
+    async def search_for_order(self, order_number: str) -> List[Order]:
+        """Search for a specific order number and extract its information."""
+        print(f"Searching for order: {order_number}")
+        
+        # Wait for the search box to be visible
+        search_box = await self.page.wait_for_selector(config.SELECTORS["search_box"], 
+                                                      timeout=config.TIMEOUT)
+        
+        # Clear any existing text in the search box
+        await search_box.fill("")
+        
+        # Enter the order number
+        await search_box.fill(order_number)
+        
+        # Click the search button
+        await self.page.click(config.SELECTORS["search_button"])
+        
+        # Wait for the page to load with search results
+        await self.page.wait_for_load_state("networkidle")
+        
+        # Check if no results were found
+        no_results = await self.page.query_selector(config.SELECTORS["no_results_message"])
+        if no_results:
+            no_results_text = await no_results.text_content()
+            if "no results" in no_results_text.lower():
+                print(f"No results found for order: {order_number}")
+                return []
+        
+        # Wait for the search results container to be visible
+        await self.page.wait_for_selector(config.SELECTORS["search_results_container"], 
+                                         timeout=config.TIMEOUT)
+        
+        # Extract orders from the search results page
+        return await self.extract_orders_from_page()
+    
+    async def search_all_target_orders(self) -> List[Order]:
+        """Search for all target order numbers."""
+        all_found_orders = []
+        
+        # Navigate to search page
+        await self.navigate_to_search_page()
+        
+        for order_number in self.target_order_ids:
+            # Search for this specific order
+            orders = await self.search_for_order(order_number)
+            
+            if orders:
+                for order in orders:
+                    if order.order_id in self.target_order_ids and order.order_id not in self.found_order_ids:
+                        all_found_orders.append(order)
+                        self.found_order_ids.add(order.order_id)
+                        print(f"Found order: {order.order_id}")
+            
+            # Give a short pause between searches to avoid rate limiting
+            await asyncio.sleep(1)
+        
+        # Check if we found all target orders
+        missing_orders = self.target_order_ids - self.found_order_ids
+        if missing_orders:
+            print(f"Could not find {len(missing_orders)} orders using search: {missing_orders}")
+            print("Will try to find missing orders by scanning all orders...")
+            return all_found_orders
+        
+        return all_found_orders
+    
+    async def filter_target_orders(self, all_orders: List[Order]) -> List[Order]:
+        """Filter orders to only include target order IDs."""
+        if not self.target_order_ids:
+            return all_orders
+        
+        filtered_orders = []
+        for order in all_orders:
+            if order.order_id in self.target_order_ids and order.order_id not in self.found_order_ids:
+                filtered_orders.append(order)
+                self.found_order_ids.add(order.order_id)
+                print(f"Found order: {order.order_id}")
+        
+        return filtered_orders
     
     async def extract_item_info(self, item_element: ElementHandle) -> OrderItem:
         """Extract information about an individual item from its element."""
@@ -263,8 +365,28 @@ class AmazonOrderExtractor:
         """Run the entire extraction process."""
         try:
             await self.setup()
-            await self.navigate_to_orders()
-            self.orders = await self.extract_all_orders()
+            
+            if config.ORDER_NUMBERS:
+                # Search for specific order numbers
+                print(f"Searching for {len(self.target_order_ids)} specific order numbers")
+                self.orders = await self.search_all_target_orders()
+                
+                # If we couldn't find all orders using search, try scanning all orders
+                missing_orders = self.target_order_ids - self.found_order_ids
+                if missing_orders:
+                    await self.navigate_to_orders()
+                    all_orders = await self.extract_all_orders()
+                    additional_orders = await self.filter_target_orders(all_orders)
+                    self.orders.extend(additional_orders)
+                    
+                    # Check if we're still missing any orders
+                    still_missing = self.target_order_ids - self.found_order_ids
+                    if still_missing:
+                        print(f"Warning: Could not find {len(still_missing)} orders: {still_missing}")
+            else:
+                # Extract all orders (original functionality)
+                await self.navigate_to_orders()
+                self.orders = await self.extract_all_orders()
             
             # Save the orders to files
             if self.orders:

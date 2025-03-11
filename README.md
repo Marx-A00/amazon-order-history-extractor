@@ -5,6 +5,7 @@ A Python tool using Playwright to extract your Amazon order history and save it 
 ## Features
 
 - Automated extraction of Amazon order history after manual login
+- Search for specific order numbers
 - Captures order dates, items purchased, prices, and order status
 - Handles pagination to retrieve your complete order history
 - Exports data to CSV and JSON formats
@@ -54,9 +55,11 @@ A Python tool using Playwright to extract your Amazon order history and save it 
 
 ## Usage
 
+### Basic Usage
+
 1. Run the script:
    ```
-   python amazon_order_extractor.py
+   python main.py
    ```
 
 2. When the browser opens, manually log in to your Amazon account
@@ -67,14 +70,45 @@ A Python tool using Playwright to extract your Amazon order history and save it 
    - Automatically extract your order history
    - Save the data to CSV and JSON files in the `output` directory
 
+### Search for Specific Orders
+
+To search for specific order numbers:
+
+```
+python main.py --orders "113-9051212-5641808,113-5645872-2010622"
+```
+
+You can provide order numbers in several formats:
+- Comma-separated list: `113-9051212-5641808,113-5645872-2010622`
+- JSON array of strings: `["113-9051212-5641808", "113-5645872-2010622"]`
+- JSON array of objects: `[{"113-9051212-5641808"}, {"113-5645872-2010622"}]`
+
+For testing, you can use the built-in test order numbers:
+
+```
+python main.py --test
+```
+
+### Additional Options
+
+- `--headless` or `-H`: Run in headless mode (no browser UI)
+- `--year` or `-y`: Filter orders by year (e.g., 2023)
+- `--max-pages` or `-m`: Maximum number of pages to process
+
+Example:
+```
+python main.py --orders "113-9051212-5641808" --year 2023 --headless
+```
+
 ## Configuration
 
-You can customize the script behavior by editing the following parameters in the script:
+You can customize the script behavior by editing the following parameters in the `config.py` file:
 
 - `ORDERS_PER_PAGE`: Number of orders displayed per page (default: 10)
 - `MAX_PAGES`: Maximum number of pages to process (default: all)
 - `OUTPUT_DIR`: Directory where output files will be saved (default: 'output')
 - `YEAR_FILTER`: Filter orders by year (default: None, all years)
+- `ORDER_NUMBERS`: List of specific order numbers to search for
 
 ## Output Format
 
@@ -96,6 +130,7 @@ Each order record contains:
 - **Page structure changes**: If Amazon changes their website structure, the script may need updating. Please open an issue if you encounter problems.
 - **Captcha challenges**: If Amazon shows a captcha, the script will pause and wait for you to solve it manually.
 - **Login issues**: The script expects you to handle the login process manually for security reasons.
+- **Order search not working**: The script will fall back to scanning all orders if specific order search doesn't work.
 
 ## License
 

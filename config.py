@@ -2,7 +2,7 @@
 Configuration settings for the Amazon Order History Extractor.
 """
 import os
-from typing import ClassVar, Dict, Optional
+from typing import ClassVar, Dict, Optional, List
 from pydantic_settings import BaseSettings
 from dotenv import load_dotenv
 
@@ -13,6 +13,7 @@ class Config(BaseSettings):
     # Amazon URLs
     AMAZON_DOMAIN: str = os.getenv("AMAZON_DOMAIN", "www.amazon.com")
     ORDERS_URL: str = f"https://{AMAZON_DOMAIN}/gp/css/order-history"
+    ORDER_SEARCH_URL: str = f"https://{AMAZON_DOMAIN}/gp/your-account/order-history/ref=ppx_yo_dt_b_search"
     
     # Extraction settings
     ORDERS_PER_PAGE: int = 10
@@ -20,6 +21,7 @@ class Config(BaseSettings):
     YEAR_FILTER: Optional[str] = None  # None means all years, or specify a year like "2023"
     TIMEOUT: int = 30000  # Page load timeout in milliseconds
     HEADLESS: bool = False  # Set to True to run browser in headless mode
+    ORDER_NUMBERS: Optional[List[str]] = None  # List of order numbers to search for
     
     # Output settings
     OUTPUT_DIR: str = "output"
@@ -39,7 +41,11 @@ class Config(BaseSettings):
         "item_quantity": ".item-view-qty",
         "order_status": ".shipment-top-row .a-color-secondary",
         "pagination_next": ".a-pagination .a-last a",
-        "login_success": "#nav-link-accountList"
+        "login_success": "#nav-link-accountList",
+        "search_box": "#searchOrdersInput",
+        "search_button": "#a-autoid-0",
+        "search_results_container": ".js-yo-main-content",
+        "no_results_message": ".a-row .a-spacing-top-xlarge h4"
     }
 
 # Create an instance of the config
