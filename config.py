@@ -2,7 +2,8 @@
 Configuration settings for the Amazon Order History Extractor.
 """
 import os
-from pydantic import BaseSettings
+from typing import ClassVar, Dict, Optional
+from pydantic_settings import BaseSettings
 from dotenv import load_dotenv
 
 # Load environment variables from .env file if it exists
@@ -15,8 +16,8 @@ class Config(BaseSettings):
     
     # Extraction settings
     ORDERS_PER_PAGE: int = 10
-    MAX_PAGES: int = None  # None means extract all pages
-    YEAR_FILTER: str = None  # None means all years, or specify a year like "2023"
+    MAX_PAGES: Optional[int] = None  # None means extract all pages
+    YEAR_FILTER: Optional[str] = None  # None means all years, or specify a year like "2023"
     TIMEOUT: int = 30000  # Page load timeout in milliseconds
     HEADLESS: bool = False  # Set to True to run browser in headless mode
     
@@ -26,7 +27,7 @@ class Config(BaseSettings):
     JSON_FILENAME: str = "amazon_orders.json"
     
     # Selectors (can be updated if Amazon changes their page structure)
-    SELECTORS = {
+    SELECTORS: ClassVar[Dict[str, str]] = {
         "orders_container": ".js-yo-main-content",
         "order_card": ".js-order-card",
         "order_id": ".yohtmlc-order-id",

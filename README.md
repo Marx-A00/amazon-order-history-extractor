@@ -23,21 +23,31 @@ A Python tool using Playwright to extract your Amazon order history and save it 
    cd amazon-order-history-extractor
    ```
 
-2. Create a virtual environment (recommended):
+2. Set up a virtual environment:
+
+   **Option 1: Using venv (Python's built-in tool)**
    ```
    python -m venv venv
    ```
 
-3. Activate the virtual environment:
+   Activate the venv environment:
    - On Windows: `venv\Scripts\activate`
    - On macOS/Linux: `source venv/bin/activate`
 
-4. Install the dependencies:
+   **Option 2: Using conda**
+   ```
+   conda create -n amazon-extractor python=3.8
+   ```
+
+   Activate the conda environment:
+   - On Windows/macOS/Linux: `conda activate amazon-extractor`
+
+3. Install the dependencies:
    ```
    pip install -r requirements.txt
    ```
 
-5. Install Playwright browsers:
+4. Install Playwright browsers:
    ```
    playwright install
    ```
